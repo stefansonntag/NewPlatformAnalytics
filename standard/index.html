@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Development Guidelines - billingtest Documentation</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Development Guidelines";
+        var mkdocs_page_input_path = "standard.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <script src="../js/jquery-3.6.0.min.js" defer></script>
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.5.0/highlight.min.js"></script>
+      <script>hljs.initHighlightingOnLoad();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> billingtest Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Welcome</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../about/">Introduction</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../chapter1/">First Steps</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="./">Development Guidelines</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#toolset">Toolset</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#vs-code">VS Code</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#qlik-cli">Qlik CLI</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#git-gitoqlok">Git &amp; Gitoqlok</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#directory-structure">Directory Structure</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#qvd-layer">QVD Layer</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#app-layer">App Layer</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#factoring">Factoring</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#versioning">Versioning</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#comments">Comments</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#meta-xls">Meta XLS</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#ui-layout">UI Layout</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#css-helper">CSS Helper</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#filter-placement">Filter Placement</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#bookmarks">Bookmarks</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#meta-xls-access">Meta XLS Access</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#naming-conventions">Naming Conventions</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#variables">Variables</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">billingtest Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" alt="Docs"></a> &raquo;</li>
+      <li>Development Guidelines</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="development-guidelines">Development Guidelines</h1>
+<h2 id="toolset">Toolset</h2>
+<h3 id="vs-code">VS Code</h3>
+<p>Git Plugin</p>
+<p>Documentation plugin</p>
+<p>Qlik Plugin</p>
+<p>Markdown Plugin</p>
+<h3 id="qlik-cli">Qlik CLI</h3>
+<p>Qlik Alias</p>
+<h3 id="git-gitoqlok">Git &amp; Gitoqlok</h3>
+<h2 id="directory-structure">Directory Structure</h2>
+<h3 id="qvd-layer">QVD Layer</h3>
+<h3 id="app-layer">App Layer</h3>
+<h2 id="factoring">Factoring</h2>
+<p>Everything in scripts</p>
+<p>Main.qvs, Setup.qvs, PreExit.qvs, Calendars, Period Tables, helper.qvs</p>
+<p>Indenting</p>
+<h2 id="versioning">Versioning</h2>
+<h2 id="comments">Comments</h2>
+<p>CALL log / logbox</p>
+<p>Line/ Block Comments</p>
+<h2 id="meta-xls">Meta XLS</h2>
+<h2 id="ui-layout">UI Layout</h2>
+<h3 id="css-helper">CSS Helper</h3>
+<h3 id="filter-placement">Filter Placement</h3>
+<h3 id="bookmarks">Bookmarks</h3>
+<h3 id="meta-xls-access">Meta XLS Access</h3>
+<h2 id="naming-conventions">Naming Conventions</h2>
+<ul>
+<li>Variables</li>
+<li>Table / Column Names</li>
+<li>Mapping Tables</li>
+<li>Keywords</li>
+</ul>
+<h3 id="variables">Variables</h3>
+<ul>
+<li>LET</li>
+<li>Cleanup</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../chapter1/" class="btn btn-neutral float-left" title="First Steps"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../chapter1/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+  </span>
+</div>
+    <script>var base_url = '..';</script>
+    <script src="../js/theme_extra.js" defer></script>
+    <script src="../js/theme.js" defer></script>
+      <script src="../search/main.js" defer></script>
+    <script defer>
+        window.onload = function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        };
+    </script>
+
+</body>
+</html>
