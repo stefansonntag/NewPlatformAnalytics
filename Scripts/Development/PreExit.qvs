@@ -1,0 +1,98 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                PreExit.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - PreExit');
+
+DROP TABLE ExcludedProjects;
+DROP TABLE ExcludedSites;
+DROP TABLE ExcludedTemplates;
+DROP TABLE ExcludedChannels;
+// DROP TABLE ExcludedExports;
+
+IF UPPER('$(vExportTables)') = 'YES' OR UPPER('$(vExportTables)') = 'Y' THEN
+    CALL storeAllTables;
+END IF
+
+// Create master calendar plus reportinig period:
+CALL createReportingPeriod('Date','Calendar','Period');
+
+RENAME FIELD Period TO Period.Calendar;
+RENAME FIELD PeriodShort TO PeriodShort.Calendar;
+
+RENAME TABLE Calendar TO CalendarTemp;
+
+Calendar:
+NOCONCATENATE
+LOAD
+    *
+    , Dual(Year(Date), floor(YearEnd(Date)))                                                         
+        AS  [Year.Calendar] 
+    , Dual('Q'&Num(Ceil(Num(Month(Date))/3))&' FY'&right(Year(Date),2),floor(QuarterEnd(Date)))       
+        AS  [QuarterYearFY.Calendar]
+    , Dual('Q'&Num(Ceil(Num(Month(Date))/3))&' '&right(Year(Date),4),floor(QuarterEnd(Date)))       
+        AS  [QuarterYearLong.Calendar]
+    , Dual('Q'&Num(Ceil(Num(Month(Date))/3))&' '&right(Year(Date),2),floor(QuarterEnd(Date)))       
+        AS  [QuarterYearShort.Calendar]
+    , Dual('Q'&Num(Ceil(Num(Month(Date))/3)),floor(QuarterEnd(Date)))       
+        AS  [Quarter.Calendar] 
+    , 'Q'&Num(Ceil(Num(Month(Date))/3))&' FY'&right(Year(Date),2)       
+        AS  [QuarterYearFYText.Calendar]
+    , 'Q'&Num(Ceil(Num(Month(Date))/3))&' '&right(Year(Date),4)       
+        AS  [QuarterYearLongText.Calendar]
+    , 'Q'&Num(Ceil(Num(Month(Date))/3))&' '&right(Year(Date),2)       
+        AS  [QuarterYearShortText.Calendar]
+    , 'Q'&Num(Ceil(Num(Month(Date))/3))       
+        AS  [QuarterText.Calendar]
+    , Dual(Month(Date)&' FY'&right(Year(Date),2), floor(monthEnd(Date)))                              
+        AS  [MonthYearFY.Calendar]
+    , Dual(Month(Date)&' '&right(Year(Date),4), floor(monthEnd(Date)))                              
+        AS  [MonthYearLong.Calendar]
+    , Dual(Month(Date)&' '&right(Year(Date),2), floor(monthEnd(Date)))                              
+        AS  [MonthYearShort.Calendar]
+    , Dual(Month(Date), floor(monthEnd(Date)))                              
+        AS  [Month.Calendar]
+    , Month(Date)&' FY'&right(Year(Date),2)                              
+        AS  [MonthYearFYText.Calendar]
+    , Month(Date)&' '&right(Year(Date),4)                              
+        AS  [MonthYearLongText.Calendar]
+    , Month(Date)&' '&right(Year(Date),2)                             
+        AS  [MonthYearShortText.Calendar]
+    , Month(Date)                              
+        AS  [MonthText.Calendar]
+    , Dual('W'&Num(Week(Date),00)&' FY'&right(Year(Date),2), floor(WeekEnd(Date)))                                             
+        AS  [WeekYearFY.Calendar]
+    , Dual('W'&Num(Week(Date),00)&'  '&right(Year(Date),4), floor(WeekEnd(Date)))                                             
+        AS  [WeekYearLong.Calendar]
+    , Dual('W'&Num(Week(Date),00)&'  '&right(Year(Date),2), floor(WeekEnd(Date)))                                             
+        AS  [WeekYearShort.Calendar]
+    , Dual('W'&Num(Week(Date),00), floor(WeekEnd(Date)))                                             
+        AS  [Week.Calendar]
+    , 'W'&Num(Week(Date),00)&' FY'&right(Year(Date),2)                                             
+        AS  [WeekYearFYText.Calendar]
+    , 'W'&Num(Week(Date),00)&'  '&right(Year(Date),4)                                             
+        AS  [WeekYearLongText.Calendar]
+    , 'W'&Num(Week(Date),00)&'  '&right(Year(Date),2)                                             
+        AS  [WeekYearShortText.Calendar]
+    , 'W'&Num(Week(Date),00)                                            
+        AS  [WeekText.Calendar]
+    , Date(Floor(Date))                                                                             
+        AS  [Date.Calendar]
+    , Text(Date(Floor(Date)))                                                                             
+        AS  [DateText.Calendar]
+RESIDENT
+     CalendarTemp
+;
+
+// add automatic calendar fields, just in case, mostly for date calc's
+DERIVE FIELDS FROM FIELD Date USING Calendar;
+
+DROP TABLE CalendarTemp;
+
+CALL logBox('End $(vAppName) - PreExit');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

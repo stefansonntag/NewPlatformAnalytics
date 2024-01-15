@@ -1,0 +1,69 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Subscription.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+CALL logBox('Start $(vAppName) - Subscription');
+
+// Straightforward load, we only need to exclude %ID.Account as that name is reserved
+// for the identifer of a PUP account (ie. on the platform) whereas in Zuora is refers
+// to the Zuora account. Since we don't need to link it in the data model to a Zuora account
+// this field can be left out
+
+Subscription:
+LOAD
+   *
+   , if( SubscriptionEndDate.Subscription < today() AND Status.Subscription = 'Active'
+         , 'Expired'
+         , if ( SubscriptionStartDate.Subscription > today() AND Status.Subscription = 'Active'
+                , 'Not yet active'
+                , Status.Subscription
+         ) 
+
+   )                                                           as NewStatus.Suscription
+;
+LOAD
+   %ID.Subscription
+   , %AccountID.Subscription
+   // , %ID.Account
+   , SubscriptionNumber.Subscription
+   , Version.Subscription
+   , Revision.Subscription
+   , TermType.Subscription
+   , InvoiceSeparately.Subscription
+   , ContractEffectiveDate.Subscription
+   , ServiceActivationDate.Subscription
+   , CustomerAcceptanceDate.Subscription
+   , Date(SubscriptionStartDate.Subscription, 'YYYY-MM-DD') as SubscriptionStartDate.Subscription
+   , SubscriptionEndDate.Subscription
+   , TermStartDate.Subscription
+   , TermEndDate.Subscription
+   , InitialTerm.Subscription
+   , InitialTermPeriodType.Subscription
+   , CurrentTerm.Subscription
+   , CurrentTermPeriodType.Subscription
+   , AutoRenew.Subscription
+   , RenewalSetting.Subscription
+   , RenewalTerm.Subscription
+   , RenewalTermType.Subscription
+   , ContractedMRR.Subscription
+   , TCV.Subscription
+   , Notes.Subscription
+   , Status.Subscription
+   , NoticePeriod.Subscription
+   , %CPQBundleJSONID.Subscription
+FROM
+   $(vZuoraCleanDataFolder)ZU_02_Subscription.qvd](qvd)
+// WHERE 
+//    [Status.Subscription] = 'Active';
+;
+
+// use the new status 
+DROP FIELD Status.Subscription;
+RENAME FIELD NewStatus.Subscription TO Status.Subscription;
+
+CALL logBox('End $(vAppName) - Subscription');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

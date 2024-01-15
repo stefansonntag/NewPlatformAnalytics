@@ -1,0 +1,144 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Channel.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Channel');
+
+LET vTableName = 'enabledOldChannelsSQL';
+
+CALL log ('Loading enabledOldChannelsSQL');
+
+// reset vLoadStart 
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+// reset vCurrentMonthStart, just in case
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// show values for debugging
+CALL log('vLoadStart is $(vLoadStart)');
+CALL log('vCurrentMonthStart is $(vCurrentMonthStart)');
+
+DO WHILE vLoadStart <= vCurrentMonthStart
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+    
+    Channel:
+    LOAD
+        autonumber(site_id&'-'&floor(loaddate))       
+                            as %ID.Site
+        , autonumber(site_id&'-'&export_id&'-'&floor(loaddate))       
+                            as %ID.Export
+        , export_id         as ChannelID.Channel
+        , site_id           as SiteID.Channel
+        , template_id       as TemplateID.Channel
+        , template_name     as Template.Channel
+        , if( applymap('NonBillableSites',site_id) = 'No', dual('No',0),
+            if(applymap('NonBillableTemplates',template_id) = 'No', dual('No',0),
+                if(applymap('NonBillableChannels',export_id) = 'No', dual('No',0),
+                dual('Yes',1))
+            )
+        )                   as Billable.Channel
+        , export_name       as Name.Channel
+        , 'New'             as Type.Channel
+        , 1                 as Count.Channel
+        , destination_name  as Destination.Channel
+        , loaddate          as LoadDate.Channel
+    FROM 
+        $(vPlatformAreaDataStorage)$(vTableName)-Monthly-$(vMonthEndString).qvd] (qvd)
+    WHERE 
+        EXISTS(SiteNumber.Site, site_id)  // exclude employee sites etc.
+    ;	
+    // load all data first, applying autonumber() etc seems to be slower
+    // on the load from file than on resident load, despite the fact that the
+    // below is not an optimized load
+
+    // add 1 month
+    LET vLoadStart = addmonths( vLoadStart, 1);
+   
+LOOP
+
+LET vTableName = 'enabledNewChannelsSQL';
+
+// reset vLoadStart 
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+// reset vCurrentMonthStart, just in case
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// show values for debugging
+CALL log('vLoadStart is $(vLoadStart)');
+CALL log('vCurrentMonthStart is $(vCurrentMonthStart)');
+
+CALL log ('Loading enabledNewChannelsSQL');
+
+DO WHILE vLoadStart <= vCurrentMonthStart
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+    
+    Channel:
+    LOAD
+        autonumber(site_id&'-'&floor(loaddate)) 
+                        as %ID.Site
+    , autonumber(site_id&'-'&channel_id&'-'&floor(loaddate))       
+                        as %ID.Export
+    , channel_id        as ChannelID.Channel
+    , site_id           as SiteID.Channel
+    , template_id       as TemplateID.Channel
+    , template_name     as Template.Channel
+    , if( applymap('NonBillableSites',site_id) = 'No', dual('No',0),
+        if(applymap('NonBillableTemplates',template_id) = 'No', dual('No',0),
+            if(applymap('NonBillableChannels',channel_id) = 'No', dual('No',0),
+            dual('Yes',1))
+        )
+    )                   as Billable.Channel
+    , channel_name      as Name.Channel
+    , 'New'             as Type.Channel
+    , 1                 as Count.Channel
+    , destination_name  as Destination.Channel
+    , loaddate          as LoadDate.Channel
+    FROM 
+        $(vPlatformAreaDataStorage)$(vTableName)-Monthly-$(vMonthEndString).qvd] (qvd)
+    WHERE 
+        EXISTS(SiteNumber.Site, site_id)  // exclude employee sites etc.
+    ;	
+    // load all data first, applying autonumber() etc seems to be slower
+    // on the load from file than on resident load, despite the fact that the
+    // below is not an optimized load
+
+    // add 1 month
+    LET vLoadStart = addmonths( vLoadStart, 1);
+   
+LOOP
+
+// needed for export.qvs
+NonBillableChannelsExpanded:
+MAPPING 
+LOAD DISTINCT
+    SiteID.Channel&'-'&ChannelID.Channel
+    , dual('No',0)
+RESIDENT 
+    Channel
+WHERE
+    Billable.Channel = 'No'
+ORDER BY
+    LoadDate.Channel DESC
+; 
+
+ExportTemplate:
+MAPPING 
+LOAD DISTINCT
+    ChannelID.Channel
+    , Template.Channel
+RESIDENT
+    Channel
+;
+
+CALL logBox('End $(vAppName) - Channel');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

@@ -1,0 +1,48 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Test.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Test');
+
+// since the monthly aggregates QVD's are called 
+// table-monthly-aggregated-year-shortmonthname.qvd
+// we need to convert dates into the year-monthname string
+
+// today
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// from which month onwards should we load?
+// variable is defined in MetaXLS
+LET vLoadStart = date(date#('$(vChannelSQLLoadStart)','MM/DD/YYYY'),'YYYY-MM-DD');
+
+LET vTableName = 'channelSQL';
+
+DO WHILE vLoadStart <= vCurrentMonthStart
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+    
+    $(vTableName):
+    // LOAD
+    //     // add computed columns here so that we can still
+    //     // load optimized from QVD
+    //     *
+    // ;
+    LOAD 
+        *
+    FROM 
+        $(vPlatformAreaDataStorage)$(vTableName)-Aggregated-Monthly-$(vMonthEndString).qvd] (qvd);
+    ;
+
+    // add 1 month
+    LET vLoadStart = addmonths( vLoadStart, 1);
+   
+LOOP
+
+CALL logBox('End $(vAppName) - Test');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+////////////////////////////////////////////////////////////////

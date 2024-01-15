@@ -1,0 +1,75 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Project.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Project');
+
+LET vTableName = 'accountProjectSite';
+
+// reset vLoadStart 
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+// reset vCurrentMonthStart, just in case
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// show values for debugging
+CALL log('vLoadStart is $(vLoadStart)');
+CALL log('vCurrentMonthStart is $(vCurrentMonthStart)');
+
+DO WHILE vLoadStart <= vCurrentMonthStart
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+
+    Project:
+    LOAD
+        site_id                                 as %SiteID.Project
+        //, project_id                            as %ID.Project
+        , project_id                            as ProjectNumber.Project
+        , site_id                               as SiteNumber.Project
+        , project_name                          as Name.Project
+        , applymap('NonBillableProjects',project_id, dual('Yes',1)) 
+                                                as Billable.Project
+        , date(floor(project_created_at),'YYYY-MM-DD')  
+                                                as CreatedDate.Project
+        , 1                                     as Status.Project
+        , date(floor(loaddate),'YYYY-MM-DD')    as LoadDate.Project
+    FROM 
+        $(vPlatformAreaDataStorage)$(vTableName)-Monthly-$(vMonthEndString).qvd] (qvd)
+    WHERE 
+        EXISTS(LoadSite, site_id)  
+    ;
+
+    // add 1 month
+    LET vLoadStart = addmonths( vLoadStart, 1);
+   
+LOOP
+
+// was auxiliary only to load the right amounts of projects (created in accounts.qvs)
+DROP TABLE SiteToLoad;
+
+// mark all sites in a non billable project also as non billable
+CONCATENATE (ExcludedSites)
+LOAD
+    SiteNumber.Project as SiteID.ExcludedSites
+RESIDENT
+    Project
+WHERE
+    Billable.Project = 'No'
+;
+
+NonBillableSites:
+MAPPING LOAD
+    SiteID.ExcludedSites
+    , dual('No',0)
+RESIDENT
+    ExcludedSites
+;
+
+CALL logBox('End $(vAppName) - Project');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

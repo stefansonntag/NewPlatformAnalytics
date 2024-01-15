@@ -1,0 +1,121 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Account.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Account');
+
+IF '$(vLoadFrom)' = 'Export' THEN
+
+    CALl log('Loading from Export Folder');
+
+    Account: 
+    LOAD 
+        *  
+    FROM 
+        $(vExportDataFolder)$(vPrefix)_Account.qvd] (qvd)
+    ;
+
+ELSE
+
+    BillTo:
+    MAPPING
+    LOAD DISTINCT
+        trim(subfield(billed_with,','))   as %ID.Account
+        , entityId                        as %AccountID.Zuora
+    FROM 
+        [lib://Downloads:PUP S3/PUP_02_zuoraAccounts.qvd](qvd)
+    WHERE LEN(billed_with) > 2
+    ;
+
+    AccountTemp:
+    LOAD
+        account_id                              as %ID.Account
+        , account_id                            as %ID.Customer
+        , account_id                            as AccountNumber.Account
+        , applymap('BillTo',account_id, account_id) 
+                                                as ParentAccountNumber.Account
+        , company                               as Name.Account
+        , client_type                           as Type.Account
+        , date(floor(loaddate),'YYYY-MM-DD')    as LoadDate.Account
+    FROM 
+        [lib://DataFiles/clientTypeAndCompany.qvd] (qvd)
+        //[lib://Downloads:PUP S3/PUP_02_clientTypeAndCompany.qvd](qvd)
+    WHERE
+        // exclude non-production accounts
+        client_type <> 'Demo Account'
+        AND client_type <> 'Demo Account'
+        AND client_type <> 'Productsup Employee'
+        AND client_type <> 'Productsup employee'
+        AND client_type <> 'Prospect'
+    ;
+
+    AccountDeleted:
+    MAPPING
+    LOAD
+        AccountNumber.Account
+        , if(max_date < floor(today())-2, max_date)
+    ;
+    LOAD
+        AccountNumber.Account
+        , date(max(floor(LoadDate.Account)),'YYYY-MM-DD') as max_date
+    RESIDENT
+        AccountTemp
+    GROUP BY
+        AccountNumber.Account
+    ;
+
+    AccountCreated:
+    MAPPING
+    LOAD
+        AccountNumber.Account
+        , date(min(floor(LoadDate.Account)),'YYYY-MM-DD') as min_date
+    RESIDENT
+        AccountTemp
+    GROUP BY
+        AccountNumber.Account
+    ;
+
+    Account:
+    NOCONCATENATE
+    LOAD
+        *
+        , if (  isnull(DeletedDate.Account)
+                , dual('No',0)
+                , dual('Yes',1) 
+        ) as IsInactive.Account
+    ;
+    LOAD
+        *
+        , applymap('AccountCreated', AccountNumber.Account,null()) 
+                    AS CreatedDate.Account
+        , applymap('AccountDeleted', AccountNumber.Account,null()) 
+                    AS DeletedDate.Account
+    RESIDENT
+        AccountTemp
+    ;
+
+    DROP TABLE AccountTemp;
+
+
+    // the below is needed to load the right set of projects; 
+    // unfortunaltey the projects qvd does not contain the account id
+    // but only the site id
+
+    SiteToLoad:
+    LOAD DISTINCT 
+        site_id as LoadSite
+    FROM 
+        [lib://Downloads:PUP S3/PUP_02_sitesSQL.qvd] (qvd)
+    WHERE
+        EXISTS(AccountID.Account,account_id)
+    ;
+
+END IF
+
+CALL logBox('End $(vAppName) - Account');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

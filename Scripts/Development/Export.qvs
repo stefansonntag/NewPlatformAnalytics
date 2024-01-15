@@ -1,0 +1,117 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Export.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Export');
+
+LET vTableName = 'exportSQL';
+
+CALL log ('Loading exportSQL');
+
+// reset vLoadStart 
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+// reset vCurrentMonthStart, just in case
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// show values for debugging
+CALL log('vLoadStart is $(vLoadStart)');
+CALL log('vCurrentMonthStart is $(vCurrentMonthStart)');
+
+DO WHILE vLoadStart <= vCurrentMonthStart 
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+
+    // hack, as it didn't work as part of the WHILE criteria, don't know why
+    IF '$(vLoadStart)' <= '2023-06-01' THEN // export.sql was depracted in June 2023
+    
+        Export:
+        LOAD
+            autonumber(site_id&'-'&export_id&'-'&datetime)       
+                                    AS %ID.Export   
+            // , site_id               AS SiteID.Export
+            , sum_product_count     AS SumProducts.Export
+            , min_product_count     AS MinProducts.Export
+            , max_product_count     AS MaxProducts.Export
+            , avg_product_count     AS AvgProducts.Export
+            , median_product_count  AS MedianProducts.Export
+            , datetime              AS LoadDate.Export
+            // , template_id           AS TemplateID.Export
+            // , template_name         AS Template.Export
+            // , channel_id   		   AS ExportID.Export
+            // , channel_name          AS Name.Export
+            // , applymap('NonBillableChannelsExpanded',site_id&'-'&channel_id, dual('Yes',1))
+            //                         AS Billable.Export 
+            , 1                     AS Type.Export
+        
+        FROM 
+            $(vPlatformAreaDataStorage)$(vTableName)-Aggregated-Monthly-$(vMonthEndString).qvd] (qvd)
+        WHERE 
+            EXISTS(SiteNumber.Site, site_id)  // exclude employee sites etc.
+        ;
+    END IF
+    
+    // add 1 month
+    LET vLoadStart = addmonths( vLoadStart, 1);
+
+LOOP
+
+LET vTableName = 'channelSQL';
+
+CALL log ('Loading channelSQL');
+
+// reset vLoadStart 
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+// reset vCurrentMonthStart, just in case
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// show values for debugging
+CALL log('vLoadStart is $(vLoadStart)');
+CALL log('vCurrentMonthStart is $(vCurrentMonthStart)');
+
+DO WHILE vLoadStart <= vCurrentMonthStart
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+
+    Export:
+    LOAD
+        autonumber(site_id&'-'&channel_id&'-'&datetime)       
+                                AS %ID.Export   
+        // , site_id               AS SiteID.Export
+        , sum_product_count     AS SumProducts.Export
+        , min_product_count     AS MinProducts.Export
+        , max_product_count     AS MaxProducts.Export
+        , avg_product_count     AS AvgProducts.Export
+        , median_product_count  AS MedianProducts.Export
+        , datetime              AS LoadDate.Export
+        // , template_id           AS TemplateID.Export
+        // , template_name         AS Template.Export
+        // , channel_id   			AS ExportID.Export
+        // , channel_name          AS Name.Export
+        , 2                     AS Type.Export
+        // , applymap('NonBillableChannelsExpanded',site_id&'-'&channel_id, dual('Yes',1))
+        //                        AS Billable.Export 
+    FROM 
+        $(vPlatformAreaDataStorage)$(vTableName)-Aggregated-Monthly-$(vMonthEndString).qvd] (qvd)
+    WHERE 
+        EXISTS(SiteNumber.Site, site_id)  // exclude employee sites etc.
+    ;                         
+    // add 1 month
+    LET vLoadStart = addmonths( vLoadStart, 1);
+
+LOOP                    
+
+// reset vLoadStart to it's orginal value
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+CALL log('vLoadStart is $(vLoadStart) again');
+
+CALL logBox('End $(vAppName) - Export');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

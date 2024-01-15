@@ -1,0 +1,61 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                LoadInvoiceLineItem.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - LoadInvoiceLineItem');
+
+// Overages are calculated monthly, so we need to be able to select a month in the UI
+// and see how many overages there were for which price parameter. Also for trend analysis 
+// and other purposes (e.g. black friday x mas period etc.) we need a monthly breakdown of longer
+// service periods
+// To be able to do this we need to create one record per month for each line item for the
+// service period it charges (field "ServiceDuration", see above). 
+// The minimum duration is one month, the maximum duration depends on the contract. 
+
+InvoiceItem:
+NOCONCATENATE
+LOAD
+  *
+  , ChargeAmount.InvoiceItem/ServiceDurationInMonths.InvoiceItem                            AS ChargeAmountMonthly.InvoiceItem
+  , TaxAmount.InvoiceItem/ServiceDurationInMonths.InvoiceItem                               AS TaxAmountMonthly.InvoiceItem
+  , %CustomerID.InvoiceItem&date(ServiceMonth.InvoiceItem,'DD.MM.YYYY')                     AS %InvoiceID.Calendar
+  , %CustomerID.InvoiceItem&date(ServiceMonth.InvoiceItem,'DD.MM.YYYY')                     AS %InvoiceIDCheckDate.InvoiceItem
+;
+LOAD 
+  %ID.InvoiceItem                             
+  , %ID.Invoice                                                                             AS %InvoiceID.InvoiceItem
+  , ChargeID.InvoiceItem                                                                    AS %ChargeID.InvoiceItem
+  , ChargeAmount.InvoiceItem
+  , ChargeType.InvoiceItem
+  , ProcessingType.InvoiceItem
+  , ChargeName.InvoiceItem
+  , ProductName.InvoiceItem
+  , Balance.InvoiceItem
+  , TaxAmount.InvoiceItem
+  , ChargeDate.InvoiceItem
+  , date(date#(ServiceStartDate.InvoiceItem,'YYYY-MM-DD'))                                  AS ServiceStartDate.InvoiceItem
+  , date(date#(ServiceEndDate.InvoiceItem,'YYYY-MM-DD'))                                    AS ServiceEndDate.InvoiceItem
+  , applymap('Invoice2Customer',%ID.Invoice,'N/A')                                          AS %CustomerID.InvoiceItem
+  , date(floor(monthend(ChargeDate.InvoiceItem)))                                           AS ChargeMonth.InvoiceItem
+  , monthend(addmonths(date(date#(ServiceStartDate.InvoiceItem,'YYYY-MM-DD')),Iterno()-1))  AS ServiceMonth.InvoiceItem
+  , ((year(Date#([ServiceEndDate.InvoiceItem],'YYYY-MM-DD'))*12)+month(Date#([ServiceEndDate.InvoiceItem],'YYYY-MM-DD')))  
+    - (((year(Date#([ServiceStartDate.InvoiceItem],'YYYY-MM-DD'))*12)+month(Date#([ServiceStartDate.InvoiceItem],'YYYY-MM-DD'))))
+    +1                                                                                      AS ServiceDurationInMonths.InvoiceItem
+  , monthend(Date#([ServiceEndDate.InvoiceItem],'YYYY-MM-DD'))                              AS ServiceEndMonth.InvoiceItem
+  , monthend(Date#([ServiceStartDate.InvoiceItem],'YYYY-MM-DD'))                            AS ServiceStartMonth.InvoiceItem
+FROM 
+	$(vZuoraCleanDataFolder)ZU_02_InvoiceItem.qvd](qvd)
+WHILE 
+  // create 1 record for every month between the service start and end month
+  addmonths(monthend(Date#([ServiceStartDate.InvoiceItem],'YYYY-MM-DD')),Iterno()-1) <= monthend(Date#([ServiceEndDate.InvoiceItem],'YYYY-MM-DD'))
+;
+
+
+
+CALL logBox('End $(vAppName) - LoadInvoiceLineItem');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

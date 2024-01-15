@@ -1,0 +1,78 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Import.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Import');
+
+
+IF '$(vLoadFrom)' = 'Export' THEN
+
+    CALl log('Loading from Export Folder');
+
+    // can't use load * because of the applymap. This setup allows to load
+    // all data faster than from the source files via qvd while testing out
+    // exclusions etc. in the XLS tables - otherwise each load would be 15-20 min
+
+    Import: 
+    LOAD 
+        *
+        , applymap('NonBillableSites',SiteID.Import, dual('Yes',1)) 
+                as Billable.ImportTemp
+    FROM 
+        $(vExportDataFolder)$(vPrefix)_Import.qvd] (qvd)
+    ;
+
+    DROP FIELD Billable.Import;
+    RENAME FIELD Billable.ImportTemp TO Billable.Import;
+
+
+ELSE
+
+    // load all data first, applying autonumber() etc seems to be slower
+    // on the load from file than on resident load, despite the fact that the
+    // below is not an optimized load
+
+    ImportTemp:
+    LOAD
+        site_id
+        , floor(datetime) AS datetime                       			
+        , products
+    FROM 
+        [lib://Downloads:PUP S3/PUP_02_importedSQL.qvd](qvd)
+    WHERE 
+        date(floor(datetime),'YYYY-MM-DD') >= '$(vStartDate)'
+        // AND date(floor(datetime),'YYYY-MM-DD') <= today()
+        AND EXISTS(SiteID.Site, site_id)  // exclude employee sites etc.
+    ;
+
+    Import:
+    LOAD
+        autonumber(site_id&'-'&datetime)
+                                        AS %ID.Site
+        , site_id                       AS SiteID.Import
+        , 1           	                AS Syndications.Import
+        , sum(products)                 AS SumProducts.Import
+        , max(products)                 AS MaxProducts.Import
+        , min(products)                 AS MinProducts.Import
+        , avg(products)                 AS AvgProducts.Import
+        , date(floor(datetime),'YYYY-MM-DD') 
+                                        AS LoadDate.Import
+        , applymap('NonBillableSites',site_id, dual('Yes',1)) 
+                as Billable.Import
+    RESIDENT 
+        ImportTemp
+    GROUP BY
+        site_id, datetime
+    ;
+
+    DROP TABLE ImportTemp;
+
+END IF
+
+CALL logBox('End $(vAppName) - Import');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

@@ -1,0 +1,42 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                User.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - User');
+
+IF '$(vLoadFrom)' = 'Export' THEN
+
+    CALl log('Loading from Export Folder');
+    
+    User: 
+    LOAD 
+        * 
+    FROM 
+        $(vExportDataFolder)$(vPrefix)_User.qvd] (qvd)
+    ;
+
+ELSE
+
+    User:
+    LOAD
+        autonumber(account_id&'-'&floor(loaddate)) 
+                                                as %ID.User
+        , amount                                as Users.User
+        , date(floor(loaddate),'YYYY-MM-DD')    as LoadDate.User
+    FROM 
+        [lib://Downloads:PUP S3/PUP_02_userSQL.qvd](qvd)
+    WHERE 
+        date(floor(loaddate),'YYYY-MM-DD') >= '$(vStartDate)'
+        // AND date(floor(loaddate),'YYYY-MM-DD') <= today()
+        AND EXISTS(AccountID.Account, account_id)
+    ;
+
+END IF
+
+CALL logBox('End $(vAppName) - User');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

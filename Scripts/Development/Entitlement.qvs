@@ -1,0 +1,135 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Entitlement.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Entitlement');
+
+RatePlanCharge:
+NOCONCATENATE
+LOAD 
+  *
+FROM 
+	$(vZuoraCleanDataFolder)ZU_02_RatePlanCharge.qvd](qvd)
+WHERE
+	Model.RatePlanCharge = 'Overage'
+  AND Type.RatePlanCharge = 'Usage'
+  // AND ApplyMap('SubscriptionStatus', %SubscriptionID.RatePlanCharge) = 'Active'
+  AND LEN(EffectiveEndDate.RatePlanCharge) > 0
+;
+
+// rename to Entitlements
+CALL truncateTableName('RatePlanCharge');
+RENAME TABLE RatePlanCharge TO Entitlement;
+CALL appendTableName('Entitlement');
+
+RENAME TABLE Entitlement to EntitlementTemp;
+RENAME FIELD %ID.Entitlement TO %EntitlementID.Entitlement;
+
+Entitlement:
+NOCONCATENATE
+LOAD
+  *
+  , %SubscriptionID.Entitlement&'-'&num(EntitlementMonth.Entitlement)
+                                        as %SubscriptionKey.Entitlement
+  , %EntitlementID.Entitlement          as %ID.RatePlanCharge
+WHERE
+  SubscriptionStatus.Entitlement = 'Active'
+;
+LOAD
+  *
+  , %AccountID.Entitlement              as %CustomerID.Entitlement
+  , ((year(Date#([EffectiveEndDate.Entitlement],'YYYY-MM-DD'))*12)+month(Date#([EffectiveEndDate.Entitlement],'YYYY-MM-DD')))  
+    - (((year(Date#([EffectiveStartDate.Entitlement],'YYYY-MM-DD'))*12)+month(Date#([EffectiveStartDate.Entitlement],'YYYY-MM-DD'))))
+    +1                                  as EntitlementDurationInMonths.Entitlement
+  , date(floor(monthend(EffectiveEndDate.Entitlement)),'YYYY-MM-DD')  
+                                        as EntitlementEndMonth.Entitlement
+  , date(floor(monthend(EffectiveStartDate.Entitlement)),'YYYY-MM-DD') 
+                                        as EntitlementStartMonth.Entitlement
+  , date(floor(addmonths(monthend(EffectiveStartDate.Entitlement) ,IterNo()-1)),'YYYY-MM-DD') 
+                                        as EntitlementMonth.Entitlement
+RESIDENT
+  EntitlementTemp
+WHILE
+  addmonths(monthend(EffectiveStartDate.Entitlement),IterNo()-1) <= monthend(EffectiveEndDate.Entitlement)
+;
+;
+DROP TABLE EntitlementTemp;
+
+/* from overages 3.0
+
+SubscriptionStatus:
+MAPPING LOAD
+	%ID.Subscription
+  , Status.Subscription
+FROM 
+	$(vZuoraCleanDataFolder)ZU_02_Subscription.qvd](qvd)
+;
+
+// Entitlements are a subset of the data in RatePlanCharge
+// so lets create a extra table for them
+RatePlanCharge:
+NOCONCATENATE
+LOAD 
+  *
+FROM 
+	$(vZuoraCleanDataFolder)ZU_02_RatePlanCharge.qvd](qvd)
+WHERE
+	Model.RatePlanCharge = 'Overage'
+  AND Type.RatePlanCharge = 'Usage'
+  AND ApplyMap('SubscriptionStatus', %SubscriptionID.RatePlanCharge) = 'Active'
+  AND LEN(EffectiveEndDate.RatePlanCharge) > 0
+;
+
+// rename to Entitlements
+CALL truncateTableName('RatePlanCharge');
+RENAME TABLE RatePlanCharge TO Entitlement;
+CALL appendTableName('Entitlement');
+
+RENAME TABLE Entitlement to EntitlementTemp;
+RENAME FIELD %ID.Entitlement TO %EntitlementID.Entitlement;
+
+// NOTE Entitlements are stored at the child account level in Zuora,
+// whereas Invoices are stored at the parent account if there is a 
+// parent account, else they are stored also at child account level.
+// So the AccountID (= Zuora Account) will work for linking entitlements
+// to the link table ('%CustomerID.Entitlement')
+
+// As with the billing period in Invoiced Line Items,
+// the entitlemment is for a period (usually the term of the contract)
+// and expressed with a start date and an end date in the record
+// To allow the end user to select a month and see what the usage, entitlment
+// and invoiced amounts are, I need to prorate the entitlement as I did in
+// LoadInvoiceLineItem.qvs and then attach the Entitlement record
+// to the prorated one, so that we can allway look it up even though
+// only a subset of the entitled period is selected in the UI
+
+Entitlement:
+NOCONCATENATE 
+LOAD
+  *
+  , %EntitlementID.Entitlement                                      AS %EntitlementID.Calendar
+  , %AccountID.Entitlement                                          AS %CustomerID.Entitlement
+  , ((year(Date#([EffectiveEndDate.Entitlement],'YYYY-MM-DD'))*12)+month(Date#([EffectiveEndDate.Entitlement],'YYYY-MM-DD')))  
+    - (((year(Date#([EffectiveStartDate.Entitlement],'YYYY-MM-DD'))*12)+month(Date#([EffectiveStartDate.Entitlement],'YYYY-MM-DD'))))
+    +1                                                              AS EntitlementDurationInMonths.Entitlement
+  , date(floor(monthend(EffectiveEndDate.Entitlement)),'YYYY-MM-DD')  AS EntitlementEndMonth.Entitlement
+  , date(floor(monthend(EffectiveStartDate.Entitlement)),'YYYY-MM-DD') AS EntitlementStartMonth.Entitlement
+  , date(floor(addmonths(monthend(EffectiveStartDate.Entitlement) ,IterNo()-1)),'YYYY-MM-DD') AS EntitlementMonth.Entitlement
+RESIDENT
+  EntitlementTemp
+// Create 1 record per month
+WHILE
+  addmonths(monthend(EffectiveStartDate.Entitlement),IterNo()-1) <= monthend(EffectiveEndDate.Entitlement)
+;
+DROP FIELD %AccountID.Entitlement;
+DROP TABLE EntitlementTemp;
+
+*/
+
+CALL logBox('End $(vAppName) - Entitlement');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

@@ -1,0 +1,58 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Invoice.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+CALL logBox('Start $(vAppName) - Invoice');
+
+Invoice:
+LOAD
+    %ID.Invoice
+    , %ID.Account               as %AccountID.Invoice
+    , Date.Invoice
+    , InvoiceNumber.Invoice
+    , DueDate.Invoice
+    , TargetDate.Invoice
+    , Amount.Invoice
+    , Balance.Invoice
+    , CreditBalanceAdjustment.Invoice
+    , CreatedBy.Invoice
+    , Status.Invoice
+    , Reversed.Invoice
+    , LastDownload.Invoice
+FROM 
+    $(vZuoraCleanDataFolder)ZU_02_Invoice.qvd](qvd)
+;
+
+InvoiceItem:
+LOAD
+    %ID.InvoiceItem
+    , %ID.Invoice
+    , SubscriptionName.InvoiceItem
+    , %SubscriptionID.InvoiceItem
+    , ServiceStartDate.InvoiceItem
+    , ServiceEndDate.InvoiceItem
+    , ChargeAmount.InvoiceItem
+    , ChargeDescription.InvoiceItem
+    , ChargeName.InvoiceItem
+    , ChargeID.InvoiceItem
+    , ProductName.InvoiceItem
+    , Quantity.InvoiceItem
+    , TaxAmount.InvoiceItem
+    , UnitOfMeasure.InvoiceItem
+    , ChargeDate.InvoiceItem
+    , ChargeType.InvoiceItem
+    , ProcessingType.InvoiceItem
+    , Balance.InvoiceItem
+    , AppliedToItem.InvoiceItem
+    , AvailableToCreditAmount.InvoiceItem
+    , UnitPrice.InvoiceItem
+FROM 
+     $(vZuoraCleanDataFolder)ZU_02_InvoiceItem.qvd](qvd)
+;
+
+CALL logBox('End $(vAppName) - Invoice');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

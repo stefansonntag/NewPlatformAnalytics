@@ -1,0 +1,114 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Channel.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Channel');
+
+IF '$(vLoadFrom)' = 'Export' THEN
+
+    CALl log('Loading from Export Folder');
+
+    // can't use load * because of the applymap. This setup allows to load
+    // all data faster than from the source files via qvd while testing out
+    // exclusions etc. in the XLS tables - otherwise each load would be 15-20 min
+
+    Channel: 
+    LOAD 
+        *
+        , if( applymap('NonBillableSites',SiteID.Channel) = 'No', dual('No',0),
+            if(applymap('NonBillableTemplates',TemplateID.Channel) = 'No', dual('No',0),
+                if(applymap('NonBillableChannels',ChannelID.Channel) = 'No', dual('No',0),
+                dual('Yes',1))
+            )
+        )                   as Billable.ChannelTemp
+    FROM 
+        $(vExportDataFolder)$(vPrefix)_Channel.qvd] (qvd)
+    ;
+
+    DROP FIELD Billable.Channel;
+    RENAME FIELD Billable.ChannelTemp TO Billable.Channel;
+
+    
+ELSE
+
+    Channel:
+    LOAD
+        autonumber(site_id&'-'&floor(loaddate))       
+                            as %ID.Site
+        , autonumber(site_id&'-'&channel_id&'-'&floor(loaddate))       
+                            as %ID.Export
+        , channel_id        as ChannelID.Channel
+        , site_id           as SiteID.Channel
+        , template_id       as TemplateID.Channel
+        , template_name     as Template.Channel
+        , if( applymap('NonBillableSites',site_id) = 'No', dual('No',0),
+            if(applymap('NonBillableTemplates',template_id) = 'No', dual('No',0),
+                if(applymap('NonBillableChannels',channel_id) = 'No', dual('No',0),
+                dual('Yes',1))
+            )
+        )                   as Billable.Channel
+        , channel_name      as Name.Channel
+        , 'New'             as Type.Channel
+        , 1                 as Count.Channel
+        , destination_name  as Destination.Channel
+        , loaddate          as LoadDate.Channel
+    FROM 
+        [lib://DataFiles/enabledNewChannels.qvd] (qvd)
+    WHERE 
+        date(floor(loaddate),'YYYY-MM-DD') >= '$(vStartDate)'
+        // AND date(floor(loaddate),'YYYY-MM-DD') <= today()
+        AND EXISTS(SiteID.Site, site_id)  // exclude employee sites etc.
+    ;	
+
+    CONCATENATE (Channel)
+    LOAD
+        autonumber(site_id&'-'&floor(loaddate)) 
+                            as %ID.Site
+        , autonumber(site_id&'-'&export_id&'-'&floor(loaddate))       
+                            as %ID.Export
+        , export_id         as ChannelID.Channel
+        , site_id           as SiteID.Channel
+        , template_id       as TemplateID.Channel
+        , template_name     as Template.Channel
+        , if( applymap('NonBillableSites',site_id) = 'No', dual('No',0),
+            if(applymap('NonBillableTemplates',template_id) = 'No', dual('No',0),
+                if(applymap('NonBillableChannels',export_id) = 'No', dual('No',0),
+                dual('Yes',1))
+            )
+        )                   as Billable.Channel
+        , export_name       as Name.Channel
+        , 'Old'             as Type.Channel
+        , 1                 as Count.Channel
+        , destination_name  as Destination.Channel
+        , loaddate          as LoadDate.Channel
+    FROM 
+        [lib://DataFiles/enabledOldChannels.qvd] (qvd)
+    WHERE 
+        date(floor(loaddate),'YYYY-MM-DD') >= '$(vStartDate)'
+        // AND date(floor(loaddate),'YYYY-MM-DD') <= today()
+    ;	
+
+END IF
+
+// needed for export.qvs
+NonBillableChannelsExpanded:
+MAPPING 
+LOAD DISTINCT
+    SiteID.Channel&'-'&ChannelID.Channel
+    , dual('No',0)
+RESIDENT 
+    Channel
+WHERE
+    Billable.Channel = 'No'
+ORDER BY
+    LoadDate.Channel DESC
+; 
+
+
+CALL logBox('End $(vAppName) - Channel');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

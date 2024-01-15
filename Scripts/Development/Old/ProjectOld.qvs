@@ -1,0 +1,100 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Project.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Project');
+
+IF '$(vLoadFrom)' = 'Export' THEN
+
+    CALl log('Loading from Export Folder');
+
+    // can't use load * because of the applymap. This setup allows to load
+    // all data fast than from the source files via qvd while testing out
+    // exclusions etc. in the XLS tables - otherwise each load would be 15-20 min
+
+    Project: 
+    LOAD 
+       *
+        , applymap('NonBillableProjects',ProjectNumber.Project, dual('Yes',1)) 
+            as Billable.ProjectTemp
+    FROM 
+        $(vExportDataFolder)$(vPrefix)_Project.qvd] (qvd)
+    ;
+
+    DROP FIELD Billable.Project;
+    RENAME FIELD Billable.ProjectTemp TO Billable.Project;
+
+ELSE
+
+    Project:
+    LOAD
+        site_id                                 as %SiteID.Project
+        , project_id                            as %ID.Project
+        , project_id                            as ProjectNumber.Project
+        , site_id                               as SiteNumber.Project
+        , project_name                          as Name.Project
+        , applymap('NonBillableProjects',project_id, dual('Yes',1)) 
+                as Billable.Project
+        , date(floor(created_at),'YYYY-MM-DD')  as CreatedDate.Project
+        , 1                                     as Status.Project
+        , date(floor(loaddate),'YYYY-MM-DD')    as LoadDate.Project
+    FROM 
+        [lib://Downloads:PUP S3/PUP_02_accountProjectSite.qvd](qvd)
+    WHERE 
+        date(floor(loaddate),'YYYY-MM-DD') >= '$(vStartDate)'
+        // AND date(floor(loaddate),'YYYY-MM-DD') < today()
+
+        // exclude employee sites etc., see account.qvs
+        AND EXISTS(LoadSite, site_id)  
+    ;
+
+    DROP TABLE SiteToLoad;
+    
+    // the below doesn't work yeat because the current qvd only 
+    // contains the last days loaded not the daily history
+
+    // CONCATENATE(Project)
+    // LOAD
+    //     autonumber(site_id&'-'&date(max(loaddate)+1,'YYYY-MM-DD'))
+    //                                         as %ID.Site
+    //     , project_id                        as ProjectID.Project
+    //     // , site_id                           as SiteID.Project
+    //     , project_name                      as Name.Project
+    //     , date(created_at,'YYYY-MM-DD')     as CreatedDate.Project
+    //     , -2                                as Status.Project
+    //     // , date(loaddate,'YYYY-MM-DD')       as Date.Project
+    // FROM 
+    //     [lib://Downloads:PUP S3/PUP_02_accountProjectSite.qvd](qvd)
+    // GROUP BY
+    //     project_id, site_id, project_name, created_at
+    // ;
+
+    
+
+END IF
+
+// mark all sites in a non billable project also as non billable
+CONCATENATE (ExcludedSites)
+LOAD
+    SiteNumber.Project as SiteID.ExcludedSites
+RESIDENT
+    Project
+WHERE
+    Billable.Project = 'No'
+;
+
+NonBillableSites:
+MAPPING LOAD
+    SiteID.ExcludedSites
+    , dual('No',0)
+RESIDENT
+    ExcludedSites
+;
+
+CALL logBox('End $(vAppName) - Project');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

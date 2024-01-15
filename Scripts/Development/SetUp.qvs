@@ -1,0 +1,82 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                SetUp.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Set Up');
+
+// vLoadStart is used in subsequent scripts to loop
+// thru monthly loads and contains a formula like addmonths(monthstart(today()),-3)
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+// vCurrentMonthStart marks the end of the loop
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// show from when onwards we load
+CALL log('Will load model from $(vLoadStart) onwards');
+
+// create some mapping tables needed later
+CALL getXLS('$(vMetaXLS)','ExcludedProjects');
+CALL AppendtableName('ExcludedProjects');
+
+CALL getXLS('$(vMetaXLS)','ExcludedSites');
+CALL AppendtableName('ExcludedSites');
+
+CALL getXLS('$(vMetaXLS)','ExcludedChannels');
+CALL AppendtableName('ExcludedChannels');
+
+CALL getXLS('$(vMetaXLS)','ExcludedTemplates');
+CALL AppendtableName('ExcludedTemplates');
+
+
+NonBillableProjects:
+MAPPING LOAD
+    ProjectID.ExcludedProjects
+    , dual('No',0)
+RESIDENT
+    ExcludedProjects
+;
+
+NonBillableTemplates:
+MAPPING LOAD
+    TemplateID.ExcludedTemplates
+    , dual('No',0)
+RESIDENT
+    ExcludedTemplates
+;
+
+NonBillableChannels:
+MAPPING LOAD
+    ChannelID.ExcludedChannels,
+    dual('No',0)
+RESIDENT
+    ExcludedChannels
+;
+
+
+PUP2Zuora:
+MAPPING
+LOAD DISTINCT
+    PUPAccountID__c,
+    accountNumber
+FROM 
+        $(vZuoraCleanDataFolder)ZU_02_basicInfo.qvd] (qvd)
+;
+
+ZuoraAccountID:
+MAPPING
+LOAD DISTINCT
+    accountNumber,
+    id
+FROM 
+        $(vZuoraCleanDataFolder)ZU_02_basicInfo.qvd] (qvd)
+;
+
+
+
+CALL logBox('End $(vAppName) - Set Up');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

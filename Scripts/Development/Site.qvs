@@ -1,0 +1,130 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Site.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Site');
+
+ParentAccountNumber:
+MAPPING 
+LOAD
+    AccountNumber.Account
+    , ParentAccountNumber.Account
+RESIDENT
+    Account
+;
+
+LET vTableName = 'sitesSQL';
+
+// reset vLoadStart 
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+// reset vCurrentMonthStart, just in case
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// show values for debugging
+CALL log('vLoadStart is $(vLoadStart)');
+CALL log('vCurrentMonthStart is $(vCurrentMonthStart)');
+
+DO WHILE vLoadStart <= vCurrentMonthStart
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+    
+    SiteTemp:
+    LOAD
+        *
+    FROM 
+        $(vPlatformAreaDataStorage)$(vTableName)-Monthly-$(vMonthEndString).qvd] (qvd)
+    WHERE 
+        EXISTS(AccountNumber.Account, account_id)  // exclude employee sites etc.
+    ;
+    
+    // add 1 month
+    LET vLoadStart = addmonths( vLoadStart, 1);
+   
+LOOP    
+
+CALL Log('Now Creating Mapping Table SiteDeleted');
+
+SiteDeleted:
+MAPPING
+LOAD
+    site_id
+    , if(max_date < floor(today())-2, max_date)
+;
+LOAD
+    site_id
+    , date(max(floor(loaddate)),'YYYY-MM-DD') as max_date
+RESIDENT
+    SiteTemp
+GROUP BY
+    site_id
+;
+
+CALL log('Load final Site table');
+
+Site:
+LOAD
+    *
+    , ZuoraAccountNumber.Site&'-'&floor(monthstart(LoadDate.Site))
+                                            as %UsageID.Site
+    , ZuoraAccountNumber.Site&'-'&floor(monthstart(LoadDate.Site))
+                                            as UsageIDTemp.Site
+;
+LOAD
+    *
+    // some parent child relationships are handled outside the zuora
+    // account hierarchy, e.g. ikea where every country has it's own
+    // account on the platform, so that they can separate users, however
+    // only IKEA AB gets the bill so all these accounts need to be
+    // mapped to one IKEA account in Zuora. This is probably a legacy
+    // thing as IKEA was a customer before Zuora was introduced, hence why
+
+    // that said what we need to know is how much usage exists per zuora
+    // account, because those get the bill
+
+    // so the 1st stept is to get the parent platform account number, and 
+    // then as a 2d step to get the zuora account number for that parent account
+    
+    , applymap('PUP2Zuora',AccountNumber.Site,'N/A')        as ZuoraAccountNumber.Site
+    // , applymap('PUP2Zuora',ParentAccountNumber.Site,'N/A')  as ZuoraParentAccountNumber.Site
+    , applymap('PUP2Zuora',ParentAccountNumber.Site,'N/A')  as %AccountID.Invoice  // the parent account gets the bill
+;
+LOAD
+    autonumber(site_id&'-'&floor(loaddate))
+                                            as %ID.Site
+    , account_id                            as %ID.Account
+    , autonumber(account_id&'-'&floor(loaddate))
+                                            as %ID.User
+    , site_id                               as %SiteID.Project
+    , date(floor(loaddate),'YYYY-MM-DD')    as Date
+    , site_id                               as SiteNumber.Site
+    , applymap('ParentAccountNumber', account_id) as ParentAccountNumber.Site
+    , applymap('NonBillableSites',site_id, dual('Yes',1)) 
+                                            as Billable.Site
+    , account_id                            as AccountNumber.Site
+    , title                                 as Name.Site
+    , pick(match(status,1,0,-1),'Active','Paused','Inactive')
+                                            as Status.Site
+    , date(floor(loaddate),'YYYY-MM-DD')    as LoadDate.Site
+    , date(floor(created_at),'YYYY-MM-DD')  as CreatedDate.Site
+    , applymap('SiteDeleted', site_id, null())
+                                            as DeletedDate.Site
+RESIDENT
+    SiteTemp
+;
+
+// these were only needed temporarily to create the link for the usage table
+DROP FIELD ZuoraAccountNumber.Site;
+DROP FIELD ParentAccountNumber.Site;
+// DROP FIELD ZuoraParentAccountNumber.Site;
+
+DROP TABLE SiteTemp;
+   
+CALL logBox('End $(vAppName) - Site');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

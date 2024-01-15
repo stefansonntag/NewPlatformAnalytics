@@ -1,0 +1,53 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                LoadInvoice.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - LoadInvoice');
+
+Invoice:
+LOAD
+  *
+    // link to link table, date sensitive
+  , %CustomerID.Invoice&Date(Month.Invoice)         AS %InvoiceID.Calendar
+;
+LOAD
+  %ID.Invoice                                       AS %InvoiceID.Invoice
+  , %ID.Account                                     AS %CustomerID.Invoice
+  , Balance.Invoice
+  , Amount.Invoice
+  // CustomerCurrency is created in loadcustomer.qvs
+  , applymap('CustomerCurrency',%ID.Account,'N/A')  AS Currency.Invoice
+  , Date.Invoice
+  // don't use the actual invoice date - map it to the end of the month
+  // like we do with all other dates from zuora. Give that we allow
+  // the smallest time period a user can select to be a month only
+  // it should make no differecen, but by using monthend we ensure
+  // that all dates are aligned if we ever aloow selection of weeks
+  , date(floor(monthend(Date.Invoice)))             AS Month.Invoice
+  , DueDate.Invoice
+  , InvoiceNumber.Invoice
+  , Reversed.Invoice
+  , Status.Invoice
+  , TargetDate.Invoice
+FROM
+  	$(vZuoraCleanDataFolder)ZU_02_Invoice.qvd](qvd)
+WHERE
+  Status.Invoice = 'Posted'
+;
+
+Invoice2Customer:
+MAPPING LOAD
+  %InvoiceID.Invoice
+  , %CustomerID.Invoice
+RESIDENT
+  Invoice
+;
+
+
+CALL logBox('End $(vAppName) - LoadInvoice');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

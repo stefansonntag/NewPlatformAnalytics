@@ -1,0 +1,44 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                AppMain.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) Main');
+
+// Access Control is optional and disabled by default to avoid a lock out
+// $(Must_Include=$(vAppScripts)SectionAccess.qvs]);
+
+$(Must_Include=$(vAppScripts)SetUp.qvs]);           // most mapping tables
+ 
+// Zuora
+// $(Must_Include=$(vAppScripts)Entitlement.qvs]);     // must come before Usage
+$(Must_Include=$(vAppScripts)Usage.qvs]);           // holds both usage and entitlements
+$(Must_Include=$(vAppScripts)Subscription.qvs]);
+$(Must_Include=$(vAppScripts)Invoice.qvs]);         // invoices and line items 
+
+// Mix of both sources
+$(Must_Include=$(vAppScripts)Customer.qvs]);        // combines parent child from PUP and Zuora
+
+//Platform
+$(Must_Include=$(vAppScripts)Account.qvs]);         // PUP Account; Must load before Project
+$(Must_Include=$(vAppScripts)Project.qvs]);         // Must load before Site
+$(Must_Include=$(vAppScripts)Site.qvs]);            // best is to leave the sequence as is
+$(Must_Include=$(vAppScripts)User.qvs]);
+
+$(Must_Include=$(vAppScripts)Import.qvs]);
+
+$(Must_Include=$(vAppScripts)Channel.qvs]);         // Must load before Export
+$(Must_Include=$(vAppScripts)Export.qvs]);
+
+// to map several channels into one (e.g. AMZN)
+$(Must_Include=$(vAppScripts)TemplateGrouping.qvs]);
+
+$(Must_Include=$(vAppScripts)PreExit.qvs]);         // cleanup and calendars
+
+
+CALL logBox('End $(vAppName) Main');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

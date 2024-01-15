@@ -1,0 +1,180 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Usage.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+CALL logBox('Start $(vAppName) - Usage');
+
+// in order to have one table that contains both the amount of used entitlements,
+// the entitlement themselves, so that we can calculate overages, plus the link to the
+// subscription which is the base for the entitlements we need to pull the various
+// data points from RatePlanCharge and the Usage tables in Zuora. This is done
+// via a left join. Next the calculated fields Usage and Overage are created based on the joined table
+// and then the resulting final table is renamed to "Usage"
+// The field names are aginst the otherwise used standard where the tablename is appended
+// to the field name; here we have two different tablenames as appendices This is
+// becasue the original code comes from Channa and I havent had the time to
+// check which field we truly need in the app and which of those would run into a
+// name clash if I called them correctly from the get-go. Will do this sometimes later
+// to go back to full standard naming convention.
+
+// I leave the commented field in here on purpose, in case we need some of them
+// else I suggest to delete those lines later so that we get to a smaller
+// and easier to read script file
+
+RatePlanCharge:
+LOAD
+    %ID.RatePlanCharge,
+//     %OriginalChargeID.RatePlanCharge,
+//     %ProductRatePlanChargeID.RatePlanCharge,
+//     Number.RatePlanCharge,
+    Name.RatePlanCharge,
+    Type.RatePlanCharge,
+    Model.RatePlanCharge,
+    UOM.RatePlanCharge,
+//     Version.RatePlanCharge,
+//     PricingSummary.RatePlanCharge,
+//     PriceChangeOption.RatePlanCharge,
+//     PriceIncreasePercent.RatePlanCharge,
+    Currency.RatePlanCharge,
+    Price.RatePlanCharge,
+//     Tiers.RatePlanCharge,
+    IncludedUnits.RatePlanCharge,
+    OveragePrice.RatePlanCharge,
+//     DiscountPercent.RatePlanCharge,
+//     Discount.RatePlanCharge,
+//     ApplyDiscountTo.RatePlanCharge,
+//     DiscountLevel.RatePlanCharge,
+//     DiscountClass.RatePlanCharge,
+//     BillingDay.RatePlanCharge,
+//     ListPriceBase.RatePlanCharge,
+    BillingPeriod.RatePlanCharge,
+//     SpecificBillingPeriod.RatePlanCharge,
+//     BillingTiming.RatePlanCharge,
+//     BillingPeriodAlignment.RatePlanCharge,
+    Quantity.RatePlanCharge,
+//     SmoothingModel.RatePlanCharge,
+//     NumberOfPeriods.RatePlanCharge,
+//     OverageCalculationModel.RatePlanCharge,
+//     OverageUnusedUnitsCreditOption.RatePlanCharge,
+    UnusedUnits.RatePlanCharge,
+//     UsageRecordRatingOption.RatePlanCharge,
+//     Segment.RatePlanCharge,
+    EffectiveStartDate.RatePlanCharge,
+    EffectiveEndDate.RatePlanCharge,
+//     ProcessedThroughDAte.RatePlanCharge,
+//     ChargedThrough.RatePlanCharge,
+//     Done.RatePlanCharge,
+//     TriggerDate.RatePlanCharge,
+//     TriggerEvent.RatePlanCharge,
+//     EndDateCondition.RatePlanCharge,
+//     UpToPeriodsType.RatePlanCharge,
+//     UpToPeriods.RatePlanCharge,
+//     SpecificEndDate.RatePlanCharge,
+    MRR.RatePlanCharge,
+    DMRC.RatePlanCharge,
+    TCV.RatePlanCharge,
+    DTCV.RatePlanCharge,
+    Description.RatePlanCharge,
+//     %RatePlanID.RatePlanCharge as [%ID.RatePlan],
+    %SubscriptionID.RatePlanCharge as %ID.Subscription,
+//     SubscriptionStatus.RatePlanCharge,
+    Product.RatePlanCharge,
+    SKU.RatePlanCharge,
+    %AccountID.RatePlanCharge, // can I use ths to link to invoice and make it time bound?
+    %AccountID.RatePlanCharge & UOM.RatePlanCharge                      as Key
+FROM 
+    $(vZuoraCleanDataFolder)ZU_02_RatePlanCharge.qvd](qvd)
+;
+
+LEFT JOIN(RatePlanCharge)
+LOAD
+    %AccountID.RatePlanCharge & UOM.RatePlanCharge                      as Key
+    , AccountNumber.Usage&'-'&floor(StartDate.Usage)                    as %UsageID.Site // link to Site Table
+    , AccountNumber.Usage&'-'&floor(StartDate.Usage)                    as UsageIDTemp.Usage // link to Site Table
+    , %ID.Usage
+    , AccountNumber.Usage
+    , AccountName.Usage
+    , SubscriptionNumber.Usage
+    , ChargeNumber.Usage
+    , Quantity.Usage
+    , SubmissionDate.Usage
+    , StartDate.Usage
+    , StartDateOriginal.Usage
+    , Status.Usage
+    , Source.Usage
+    , LastDownload.Usage
+;
+LOAD
+    %ID.Usage
+    , %AccountID.Usage 												    as %AccountID.RatePlanCharge
+    , AccountNumber.Usage
+    , AccountName.Usage
+    , SubscriptionNumber.Usage
+    , ChargeNumber.Usage
+    
+    , if(	UnitOfMeasure.Usage='Syndication Frequency Overage'
+    		, 'Syndication Frequency'
+        	, UnitOfMeasure.Usage
+        ) 															    as UOM.RatePlanCharge
+   
+    , Date(SubmissionDate.Usage,'MMM-YYYY')                             as SubmissionDate.Usage 
+    
+    , if(	StartDate.Usage >= date#('8/1/2022','MM/DD/YYYY')
+    		,Date(StartDate.Usage, 'MM-YYYY')
+    	) 															    as StartDate.Usage
+    , StartDate.Usage as StartDateOriginal.Usage
+    
+    , Status.Usage
+    , Source.Usage
+    , Quantity.Usage
+    , LastDownload.Usage
+FROM 
+	$(vZuoraCleanDataFolder)ZU_02_Usage.qvd](qvd)
+WHERE
+	UnitOfMeasure.Usage <> 'SKU'
+;
+
+// create 1 field for usage and overage that contains the info we need as otherwise
+// that info is spread between RatePlanCharge and Usage, depending on the data
+// of some other fields which field in which table is the right one to query
+
+CONCATENATE(RatePlanCharge)
+LOAD
+	*
+    , if (	IncludedUnits.RatePlanCharge ='0' and UOM.RatePlanCharge = 'Sites'
+    		, '0'
+        	, Quantity.Usage
+      )  																                                       as Usage.Usage
+   
+   , if(	UOM.RatePlanCharge='Syndication Frequency'
+    		, ( if(	IncludedUnits.RatePlanCharge = '0' and UOM.RatePlanCharge =' Sites'
+        			, '0'
+                	, Quantity.Usage
+         	  	  )
+              )
+      		, if(	( if(	IncludedUnits.RatePlanCharge = '0' and UOM.RatePlanCharge = 'Sites'
+         					, '0'
+                			, Quantity.Usage
+                		)
+                    ) - IncludedUnits.RatePlanCharge < 0
+                	, 0
+                	, ( if (IncludedUnits.RatePlanCharge = '0' and UOM.RatePlanCharge = 'Sites'
+                			, '0'
+                        	, Quantity.Usage
+                        )
+                      ) - IncludedUnits.RatePlanCharge
+         	  )
+       ) 																								         as Overage.Usage
+RESIDENT
+	RatePlanCharge
+;
+
+RENAME TABLE RatePlanCharge TO Usage;
+DROP FIELD Key;
+
+CALL logBox('End $(vAppName) - Usage');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

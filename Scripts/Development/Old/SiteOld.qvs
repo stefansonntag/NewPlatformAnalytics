@@ -1,0 +1,134 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Site.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Site');
+
+IF '$(vLoadFrom)' = 'Export' THEN
+
+    CALl log('Loading from Export Folder');
+
+    // can't use load * because of the applymap. This setup allows to load
+    // all data faster than from the source files via qvd while testing out
+    // exclusions etc. in the XLS tables - otherwise each load would be 15-20 min
+
+    Site: 
+    LOAD 
+        *
+        , applymap('NonBillableSites',SiteNumber.Site, dual('Yes',1)) 
+            as Billable.SiteTemp
+    FROM 
+        $(vExportDataFolder)$(vPrefix)_Site.qvd] (qvd)
+    ;
+
+    DROP FIELD Billable.Site;
+    RENAME FIELD Billable.SiteTemp TO Billable.Site;
+
+ELSE
+
+    // load all data first, applying autonumber() etc seesm to be slower
+    // on the load from file than on resident load, despite the fact that the
+    // below is not an optimized load. Also we load the site table twice
+    // so we save the time needed to transfer the file from the S3 bucket again
+
+    ParentAccountNumber:
+    MAPPING 
+    LOAD
+        AccountNumber.Account
+        , ParentAccountNumber.Account
+    RESIDENT
+        Account
+    ;
+
+    SiteTemp:
+    LOAD
+        *
+    FROM 
+        [lib://Downloads:PUP S3/PUP_02_sitesSQL.qvd] (qvd)
+    WHERE 
+        date(floor(loaddate),'YYYY-MM-DD') >= '$(vStartDate)'
+        // AND date(floor(loaddate),'YYYY-MM-DD') <= today()
+        AND 
+        EXISTS(AccountNumber.Account, account_id)  // exclude employee sites etc.
+    ;
+
+    SiteDeleted:
+    MAPPING
+    LOAD
+        site_id
+        , if(max_date < floor(today())-2, max_date)
+    ;
+    LOAD
+        site_id
+        , date(max(floor(loaddate)),'YYYY-MM-DD') as max_date
+    RESIDENT
+        SiteTemp
+    GROUP BY
+        site_id
+    ;
+
+    Site:
+    LOAD
+        *
+        , ZuoraAccountNumber.Site&'-'&floor(monthstart(LoadDate.Site))
+                                                as %UsageID.Site
+    ;
+    LOAD
+        *
+        // some parent child relationships are handled outside the zuora
+        // account hierarchy, e.g. ikea where every country has it's own
+        // account on the platform, so that they can separate users, however
+        // only IKEA AB gets the bill so all these accounts need to be
+        // mapped to one IKEA account in Zuora. This is probably a legacy
+        // thing as IKEA was a customer before Zuora was introduced, hence why
+
+        // that said what we need to know is how much usage exists per zuora
+        // account, because those get the bill
+
+        // so the 1st stept is to get the parent platform account number, and 
+        // then as a 2d step to get the zuora account number for that parent account
+        
+        , applymap('PUP2Zuora',AccountNumber.Site,'N/A')        as ZuoraAccountNumber.Site
+        // , applymap('PUP2Zuora',ParentAccountNumber.Site,'N/A')  as ZuoraParentAccountNumber.Site
+        , applymap('PUP2Zuora',ParentAccountNumber.Site,'N/A')  as %AccountID.Invoice  // the parent account gets the bill
+    ;
+    LOAD
+        autonumber(site_id&'-'&floor(loaddate))
+                                                as %ID.Site
+        , account_id                            as %ID.Account
+        , autonumber(account_id&'-'&floor(loaddate))
+                                                as %ID.User
+        , site_id                               as %SiteID.Project
+        , date(floor(loaddate),'YYYY-MM-DD')    as Date
+        , site_id                               as SiteNumber.Site
+        , applymap('ParentAccountNumber', account_id) as ParentAccountNumber.Site
+        , applymap('NonBillableSites',site_id, dual('Yes',1)) 
+                                                as Billable.Site
+        , account_id                            as AccountNumber.Site
+        , title                                 as Name.Site
+        , status                                as Status.Site
+        , date(floor(loaddate),'YYYY-MM-DD')    as LoadDate.Site
+        , date(floor(created_at),'YYYY-MM-DD')  as CreatedDate.Site
+        , applymap('SiteDeleted', site_id, null())
+                                                as DeletedDate.Site
+    RESIDENT
+        SiteTemp
+    ;
+
+    // these were only needed temporarily to create the link for the usage table
+    DROP FIELD ZuoraAccountNumber.Site;
+    DROP FIELD ParentAccountNumber.Site;
+    // DROP FIELD ZuoraParentAccountNumber.Site;
+   
+    DROP TABLE SiteTemp;
+   
+END IF
+
+
+CALL logBox('End $(vAppName) - Site');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

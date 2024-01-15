@@ -1,0 +1,46 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                User.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - User');
+
+LET vTableName = 'userSQL';
+
+// reset vLoadStart 
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+// reset vCurrentMonthStart, just in case
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// show values for debugging
+CALL log('vLoadStart is $(vLoadStart)');
+CALL log('vCurrentMonthStart is $(vCurrentMonthStart)');
+
+DO WHILE vLoadStart <= vCurrentMonthStart
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+    User:
+    LOAD
+        autonumber(account_id&'-'&floor(loaddate)) 
+                                                as %ID.User
+        , amount                                as Users.User
+        , date(floor(loaddate),'YYYY-MM-DD')    as LoadDate.User    
+    FROM 
+        $(vPlatformAreaDataStorage)$(vTableName)-Monthly-$(vMonthEndString).qvd] (qvd)
+    WHERE
+        EXISTS(AccountNumber.Account, account_id)
+    ;
+
+    // add 1 month
+    LET vLoadStart = addmonths( vLoadStart, 1);
+   
+LOOP
+
+CALL logBox('End $(vAppName) - User');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

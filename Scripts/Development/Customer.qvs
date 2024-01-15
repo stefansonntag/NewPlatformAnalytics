@@ -1,0 +1,129 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Customer.qvs
+//  Purpose             Build the tables for Platform Analytics Customer Section
+//  Author              Stefan Sonntag
+//  Version             1.0.
+//  Last Changed on     04.07.21
+//  Last Changed by     Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Customer');
+
+// A customer is a legal entity with whom we have a contract, i.e. an entry in Zuora. Usually a customer
+// has one or more accounts on the platform. The exception are customers managed by an agency: there the agency owns the account and 
+// created projects per customer. This is also refelted in the platform account number. For‚ a direct customer it is like 4711, for 
+// indirect customers it is 4711-1234 where 1234 is the project id, and 4711 is the account id
+
+AccountName:
+MAPPING LOAD
+	OriginalAccountNumber.Account
+    , Name.Account
+FROM [lib://Data/1HU5VoyIAQgISSxHNMov3IlBsg1EKQ41L/ZU_02_Account.qvd]
+(qvd)
+; 
+
+AccountID:
+MAPPING LOAD
+	OriginalAccountNumber.Account
+    , %ID.Account
+FROM [lib://Data/1HU5VoyIAQgISSxHNMov3IlBsg1EKQ41L/ZU_02_Account.qvd]
+(qvd)
+; 
+
+Customer:
+LOAD DISTINCT
+	*
+    , applymap('AccountName',Child.Customer,'N/A')    as ChildName.Customer
+WHERE
+	ParentName.Customer <> 'N/A'
+;
+LOAD DISTINCT
+    entityId 									      as Parent.Customer
+    , applymap('AccountName',entityId,'N/A') 	      as ParentName.Customer
+    , applymap('AccountName',entityId,'N/A') 	      as Name.Customer
+   	, trim(subfield(billed_with,',')) 			      as Child.Customer
+    , 'Platform'								      as Source.Customer
+FROM 
+	[lib://Downloads:PUP S3/PUP_02_zuoraAccounts.qvd](qvd)
+WHERE
+	LEN(billed_with) > 3
+;
+
+CONCATENATE (Customer)
+LOAD DISTINCT
+	Parent.Customer								        as Parent.Customer
+    , applymap('AccountName',Parent.Customer,'N/A') 	as ParentName.Customer
+    , applymap('AccountName',Parent.Customer,'N/A') 	as Name.Customer
+    , Parent.Customer							        as Child.Customer
+    , applymap('AccountName',Parent.Customer,'N/A') 	as ChildName.Customer
+    , 'Platform'										as Source.Customer
+RESIDENT
+	Customer
+;
+
+	
+Concatenate (Customer)
+LOAD
+	*
+    , applymap('AccountName',Parent.Customer,'N/A')	as ParentName.Customer
+    , applymap('AccountName',Parent.Customer,'N/A')	as Name.Customer
+    , applymap('AccountName',Child.Customer,'N/A') 	as ChildName.Customer
+;
+LOAD DISTINCT
+	if(	ISNULL(ParentAccountNumber.Account)
+    	,OriginalAccountNumber.Account
+        ,ParentAccountNumber.Account) 
+    										        as Parent.Customer
+    , OriginalAccountNumber.Account 		        as Child.Customer
+    , 'Zuora'									    as Source.Customer
+    , %CRMID.Account                                as %SalesforceID.Customer
+FROM 
+	[lib://Data/1HU5VoyIAQgISSxHNMov3IlBsg1EKQ41L/ZU_02_Account.qvd](qvd)
+;
+
+// add only those fields from the zuora account table that are really needed
+// e.g status
+// remember to rename all fields from *.Account to *.Customer, as Account
+// in the data model refers to a platform account, not a zuora account (=Customer)
+JOIN (Customer)
+LOAD
+	Status.Account                                  as Status.Customer
+    , if( isnull(ParentAccountNumber.Account)
+          , AccountNumber.Account
+          , ParentAccountNumber.Account
+      )                                             as Parent.Customer
+FROM 
+	[lib://Data/1HU5VoyIAQgISSxHNMov3IlBsg1EKQ41L/ZU_02_Account.qvd](qvd)
+;
+
+DROP FIELD [Parent.Customer];
+RENAME FIELD Child.Customer TO [%ID.Customer];
+
+// add some salesforce data to spice it up
+
+AccountOwner:
+MAPPING LOAD
+    %ID.User
+    , Name.User
+FROM 
+    $(vSalesForceCleanDataFolder)SF_02_User.qvd] (qvd)
+;
+
+LEFT JOIN (Customer)
+LOAD
+    %ID.Account                                     as %SalesforceID.Customer
+    // Id.Account                                     as %SalesforceID.Customer
+    , CustomerSuccessManager.Account                as CSM.Customer
+    , applymap('AccountOwner', %OwnerID.Account,'N/A') as SalesRep.Customer
+FROM 
+    $(vSalesForceCleanDataFolder)SF_02_Account.qvd] (qvd)
+;
+
+
+STORE Customer INTO  $(vPlatformAreaDataStorage)Customer.qvd] (qvd);
+
+CALL logBox('End $(vAppName) - Customer');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Scripts
+/////////////////////////////////////////////////////////////////

@@ -1,0 +1,170 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Account.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Account');
+
+
+BillTo:
+MAPPING
+LOAD DISTINCT
+    trim(subfield(billed_with,','))   as %ID.Account
+    , entityId                        as %AccountID.Zuora
+FROM 
+    [lib://Downloads:PUP S3/PUP_02_zuoraAccounts.qvd](qvd)
+WHERE LEN(billed_with) > 2
+;
+
+LET vTableName = 'clientTypeAndCompany';
+
+// reset vLoadStart 
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+// reset vCurrentMonthStart, just in case
+LET vCurrentMonthStart = date(floor(monthstart(today())),'YYYY-MM-DD');
+
+// show values for debugging
+CALL log('vLoadStart is $(vLoadStart)');
+CALL log('vCurrentMonthStart is $(vCurrentMonthStart)');
+
+
+// vLoadStart and vCurrentMonthStart are defined in Setup.xls 
+DO WHILE vLoadStart <= vCurrentMonthStart
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+    
+    AccountTemp:
+    // LOAD
+    //     // add computed columns here so that we can still
+    //     // load optimized from QVD
+    //     *
+    // ;
+    LOAD 
+        account_id                              as %ID.Account
+        , account_id                            as %ID.Customer
+        , account_id                            as AccountNumber.Account
+        , applymap('BillTo',account_id, account_id) 
+                                                as ParentAccountNumber.Account
+        , company                               as Name.Account
+        , client_type                           as Type.Account
+        , date(floor(loaddate),'YYYY-MM-DD')    as LoadDate.Account
+    FROM 
+        $(vPlatformAreaDataStorage)$(vTableName)-Monthly-$(vMonthEndString).qvd] (qvd)
+    WHERE
+        // exclude non-production accounts
+        client_type <> 'Demo Account'
+        AND client_type <> 'Demo Account'
+        AND client_type <> 'Productsup Employee'
+        AND client_type <> 'Productsup employee'
+        AND client_type <> 'Prospect'
+    ;
+
+    // add 1 month
+    LET vLoadStart = addmonths( vLoadStart, 1);
+   
+LOOP
+
+
+// prepare to add more fields
+
+// an account is considered as deleted when he np longer
+// shows up in the daily export
+AccountDeleted:
+MAPPING
+LOAD
+    AccountNumber.Account
+    , if(max_date < floor(today())-2, max_date)
+;
+LOAD
+    AccountNumber.Account
+    , date(max(floor(LoadDate.Account)),'YYYY-MM-DD') as max_date
+RESIDENT
+    AccountTemp
+GROUP BY
+    AccountNumber.Account
+;
+
+// an account is considered as newly created when he
+// shows up in the daily export for the first time
+
+AccountCreated:
+MAPPING
+LOAD
+    AccountNumber.Account
+    , date(min(floor(LoadDate.Account)),'YYYY-MM-DD') as min_date
+RESIDENT
+    AccountTemp
+GROUP BY
+    AccountNumber.Account
+;
+
+// now add the fields
+Account:
+NOCONCATENATE
+LOAD
+    *
+    , if (  isnull(DeletedDate.Account)
+            , dual('No',0)
+            , dual('Yes',1) 
+    ) as IsInactive.Account
+;
+LOAD
+    *
+    , applymap('AccountCreated', AccountNumber.Account,null()) 
+                AS CreatedDate.Account
+    , applymap('AccountDeleted', AccountNumber.Account,null()) 
+                AS DeletedDate.Account
+RESIDENT
+    AccountTemp
+;
+
+DROP TABLE AccountTemp;
+
+
+// the below is needed to load the right set of projects; 
+// unfortunatley the projects qvd does not contain the account id
+// but only the site id. Becaause we load in monthly batches we need
+// to repeat the loop structure above and get the account id from
+// the monthly sites
+
+// reset vLoadStart to it's orginal value
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+
+CALL log('Loading SiteToLoad');
+
+DO WHILE vLoadStart <= vCurrentMonthStart
+
+    // create the string
+    LET vMonthEndString = text(date(floor(num(monthend(vLoadStart))),'YYYY-MM'));
+    
+    SiteToLoad:
+    LOAD DISTINCT
+        site_id as LoadSite
+    FROM 
+        $(vPlatformAreaDataStorage)sitesSQL-Monthly-$(vMonthEndString).qvd] (qvd)
+    WHERE
+        EXISTS(AccountNumber.Account,account_id)
+    ;
+
+    LET vLoadStart = addmonths( vLoadStart, 1);
+
+LOOP
+
+// reset vLoadStart to it's orginal value
+LET vLoadStart = date(floor($(vModelLoadStart)),'YYYY-MM-DD');
+CALL log('vLoadStart is $(vLoadStart) again');
+
+// cleanup
+LET vTableName          = NULL();
+LET vMonthEndString     = NULL();
+LET vLoadStart          = NULL();
+LET vCurrentMonthStart  = NULL();
+
+CALL logBox('End $(vAppName) - Account');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

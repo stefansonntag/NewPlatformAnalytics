@@ -1,0 +1,148 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                Export.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - Export');
+
+IF '$(vLoadFrom)' = 'Export' THEN
+
+    CALl log('Loading from Export Folder');
+
+    // can't use load * because of the applymap. This setup allows to load
+    // all data faster than from the source files via qvd while testing out
+    // exclusions etc. in the XLS tables - otherwise each load would be 15-20 min
+
+    Export: 
+    LOAD 
+        *
+        , applymap('NonBillableChannelsExpanded',SiteID.Export&'-'&ExportID.Export, dual('Yes',1))
+                                AS Billable.ExportTemp
+    FROM 
+        $(vExportDataFolder)$(vPrefix)_Export.qvd] (qvd)
+    ;
+
+    DROP FIELD Billable.Export;
+    RENAME FIELD Billable.ExportTemp TO Billable.Export;
+ELSE
+
+    ExportTemp:
+    LOAD
+        site_id
+        , floor(datetime)         AS datetime                       
+        , export_id
+        , export_name          
+        , template_name   			
+        , product_count
+    FROM 
+        [lib://Downloads:PUP S3/PUP_02_exportSQL.qvd](qvd)
+    WHERE 
+        date(floor(datetime),'YYYY-MM-DD') >= '$(vStartDate)'
+        // AND date(floor(datetime),'YYYY-MM-DD') < today()
+        AND EXISTS(SiteID.Site, site_id)  // exclude employee sites etc.
+    ;
+
+    // for convenience only as the template name (see below) can also be
+    // retrieved from the channels table 
+    OldExportTemplate:
+    MAPPING 
+    LOAD DISTINCT
+        export_id
+        , template_name
+    RESIDENT
+        ExportTemp
+    ;
+
+    Export:
+    LOAD 
+        autonumber(site_id&'-'&export_id&'-'&datetime)       
+                                AS %ID.Export     
+        , site_id               AS SiteID.Export                 
+        , export_id   			AS ExportID.Export
+        , export_name           AS Name.Export
+        , 1                     AS Type.Export
+        // for convenience only as the template name (see above) can also be
+        // retrieved from the channels table 
+        , applymap('OldExportTemplate', export_id,'N/A')
+                                as Template.Export
+        , applymap('NonBillableChannelsExpanded',site_id&'-'&export_id, dual('Yes',1))
+                                AS Billable.Export 
+        , count(export_id)      AS Syndications.Export
+        , sum(product_count)    AS SumProducts.Export
+        , max(product_count)    AS MaxProducts.Export
+        , min(product_count)    AS MinProducts.Export
+        , avg(product_count)    AS AvgProducts.Export
+        , date(floor(datetime),'YYYY-MM-DD')
+                                AS LoadDate.Export
+    RESIDENT
+        ExportTemp    
+    GROUP BY
+        site_id, datetime, export_id, export_name
+    ;
+
+    DROP TABLE ExportTemp;
+
+    ChannelTemp:
+    LOAD
+        site_id
+        , floor(datetime)         AS datetime                       
+        , channel_id
+        , channel_name
+        , template_name   			
+        , product_count
+    FROM 
+        [lib://Downloads:PUP S3/PUP_02_channelSQL.qvd](qvd)
+    WHERE 
+        date(floor(datetime),'YYYY-MM-DD') >= '$(vStartDate)'
+        // AND date(floor(datetime),'YYYY-MM-DD') < today()
+    ;
+
+    // for convenience only as the template name (see below) can also be
+    // retrieved from the channels table 
+
+    NewExportTemplate:
+    MAPPING 
+    LOAD DISTINCT
+        channel_id
+        , template_name
+    RESIDENT
+        ChannelTemp
+    ;
+
+    CONCATENATE (Export)
+    LOAD
+        autonumber(site_id&'-'&channel_id&'-'&datetime)       
+                                AS %ID.Export   
+        , site_id               AS SiteID.Export                   
+        , channel_id   			AS ExportID.Export
+        , channel_name          AS Name.Export
+        , 2                     AS Type.Export 
+        // for convenience only as the template name (see above) can also be
+        // retrieved from the channels table 
+        , applymap('NewExportTemplate', channel_id,'N/A')
+                                as Template.Export 
+        , applymap('NonBillableChannelsExpanded',site_id&'-'&channel_id, dual('Yes',1))
+                                AS Billable.Export 
+        , count(channel_id)     AS Syndications.Export
+        , sum(product_count)    AS SumProducts.Export
+        , max(product_count)    AS MaxProducts.Export
+        , min(product_count)    AS MinProducts.Export
+        , avg(product_count)    AS AvgProducts.Export
+        , date(floor(datetime),'YYYY-MM-DD')
+                                AS LoadDate.Export
+    RESIDENT 
+        ChannelTemp
+    GROUP BY
+        site_id, datetime, channel_id, channel_name
+    ;
+
+    DROP TABLE ChannelTemp;
+
+END IF
+
+CALL logBox('End $(vAppName) - Export');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////

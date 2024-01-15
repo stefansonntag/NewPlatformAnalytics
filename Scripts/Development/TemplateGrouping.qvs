@@ -1,0 +1,43 @@
+/////////////////////////////////////////////////////////////////////////////
+//  Name                TemplateGrouping.qvs
+//  Purpose             
+//  Author              Stefan Sonntag
+/////////////////////////////////////////////////////////////////////////////
+
+CALL logBox('Start $(vAppName) - TemplateGrouping');
+
+// to allow for clustering of channels
+// will be always applied (i.e load from source or export)
+
+CALL getXLS('$(vMetaXLS)','TemplateGrouping');
+CALL AppendtableName('TemplateGrouping');
+
+GroupedTemplates:
+MAPPING LOAD
+    TemplateID.TemplateGrouping
+    , MasterTemplateID.TemplateGrouping
+RESIDENT
+    TemplateGrouping
+;
+
+DROP TABLE TemplateGrouping;
+
+RENAME TABLE Channel TO ChannelTemp;
+
+Channel:
+NOCONCATENATE
+LOAD
+    *
+    , applymap('GroupedTemplates',TemplateID.Channel, TemplateID.Channel)
+                        as MasterTemplateID.Channel
+RESIDENT
+    ChannelTemp
+;
+
+DROP TABLE ChannelTemp;
+
+CALL logBox('End $(vAppName) - TemplateGrouping');
+
+/////////////////////////////////////////////////////////////////
+// 						 End Script
+/////////////////////////////////////////////////////////////////
